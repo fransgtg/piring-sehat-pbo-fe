@@ -29,20 +29,27 @@ export default function App() {
 
   const openWindow = (appId) => {
     setStartMenuOpen(false)
-    if (!windows.find(w => w.id === appId)) {
-      setWindows([...windows, { ...apps[appId], zIndex: windows.length + 1 }])
-    }
-    focusWindow(appId)
+    setActiveWindowId(appId)
+    setWindows(prevWindows => {
+      let newWindows = prevWindows
+      if (!prevWindows.find(w => w.id === appId)) {
+        newWindows = [...prevWindows, { ...apps[appId], zIndex: prevWindows.length + 1 }]
+      }
+      return newWindows.map(w => ({
+        ...w,
+        zIndex: w.id === appId ? 999 : w.zIndex > 0 ? w.zIndex - 1 : 0
+      }))
+    })
   }
 
   const closeWindow = (appId) => {
-    setWindows(windows.filter(w => w.id !== appId))
+    setWindows(prevWindows => prevWindows.filter(w => w.id !== appId))
     if (activeWindowId === appId) setActiveWindowId(null)
   }
 
   const focusWindow = (appId) => {
     setActiveWindowId(appId)
-    setWindows(windows.map(w => ({
+    setWindows(prevWindows => prevWindows.map(w => ({
       ...w,
       zIndex: w.id === appId ? 999 : w.zIndex > 0 ? w.zIndex - 1 : 0
     })))
@@ -110,7 +117,7 @@ export default function App() {
       {startMenuOpen && (
         <div className="retro-start-menu flex">
           <div className="retro-start-menu-sidebar">
-            <span>Windows 95</span>
+            <span>Piring Sehat</span>
           </div>
           <div className="retro-start-menu-items flex-1">
             <button className="retro-start-menu-item font-bold" onClick={() => openWindow('auth')}>
