@@ -12,11 +12,9 @@ export default function FoodSearchExplorer() {
     e.preventDefault()
     if (!searchQuery.trim()) return
 
-    // TODO: Replace with actual API call → GET /api/food/search?q={searchQuery}
-    console.log('[FOOD] Search payload:', { query: searchQuery })
     setStatusMessage(`Searching for "${searchQuery}"... (waiting for backend)`)
     
-    // Simulate empty results for now since we can't use mock data
+    // Simulate empty results for now since backend food API is not yet implemented
     setResults([]) 
   }
 

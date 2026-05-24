@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useAuth } from '../../hooks/useAuth'
 import RetroButton from '../ui/RetroButton'
 import RetroInput from '../ui/RetroInput'
 import RetroTextarea from '../ui/RetroTextarea'
 
 export default function CommunityForum() {
+  const { user, profile } = useAuth()
   const [activeView, setActiveView] = useState('list') // 'list' | 'compose'
   
   // ─── Compose State (DTO-Ready) ───
@@ -21,19 +23,19 @@ export default function CommunityForum() {
     e.preventDefault()
     if (!composePayload.title || !composePayload.content) return
 
+    // Gunakan username asli dari profil database atau metadata auth
+    const authorName = profile?.username || user?.email?.split('@')[0] || 'Anonymous'
+
     const newThread = {
       id: Date.now(),
       title: composePayload.title,
       content: composePayload.content,
-      author: 'CurrentUser', // Mock for now
+      author: authorName,
       replies: 0,
       timestamp: new Date().toLocaleString(),
     }
 
     setThreads([newThread, ...threads])
-    
-    // TODO: Replace with actual API call → POST /api/forum/threads
-    console.log('[FORUM] Create thread payload:', composePayload)
     
     setComposePayload({ title: '', content: '' })
     setActiveView('list')
