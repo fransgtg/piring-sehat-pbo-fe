@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from './hooks/useAuth'
 import RetroWindow from './components/ui/RetroWindow'
 import AuthWindow from './components/auth/AuthWindow'
 import BMICalculator from './components/bmi/BMICalculator'
@@ -8,6 +9,7 @@ import CommunityForum from './components/forum/CommunityForum'
 import './App.css'
 
 export default function App() {
+  const { user } = useAuth() // Mengambil status login pengguna
   const [windows, setWindows] = useState([])
   const [activeWindowId, setActiveWindowId] = useState(null)
   const [startMenuOpen, setStartMenuOpen] = useState(false)
@@ -27,8 +29,20 @@ export default function App() {
     forum: { id: 'forum', title: 'Community Forum', icon: '🌐', component: CommunityForum, width: 600, height: 450 },
   }
 
+  // Daftar fitur yang memerlukan login sebelum bisa diakses
+  const protectedApps = ['bmi', 'calories', 'food', 'forum']
+
   const openWindow = (appId) => {
     setStartMenuOpen(false)
+
+    // Proteksi Auth: Jika user belum login dan mencoba membuka fitur terproteksi,
+    // tampilkan peringatan bergaya Win95 dan buka jendela Login sebagai gantinya.
+    if (protectedApps.includes(appId) && !user) {
+      alert('⚠️ Access Denied\n\nAnda harus login terlebih dahulu untuk mengakses fitur ini.')
+      // Buka jendela auth secara otomatis
+      appId = 'auth'
+    }
+
     setActiveWindowId(appId)
     setWindows(prevWindows => {
       let newWindows = prevWindows
@@ -169,6 +183,7 @@ export default function App() {
 
         {/* System Tray */}
         <div className="retro-systray">
+          {user && <span className="text-[10px] mr-2">👤 {user.email?.split('@')[0] || 'User'}</span>}
           {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
