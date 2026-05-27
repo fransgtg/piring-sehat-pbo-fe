@@ -2,9 +2,13 @@ import { useState } from 'react'
 import RetroButton from '../ui/RetroButton'
 import RetroInput from '../ui/RetroInput'
 import RetroSelect from '../ui/RetroSelect'
+import RetroCalendar from '../ui/RetroCalendar'
 
 export default function CalorieTracker() {
   const dailyGoal = 2000
+
+  // ─── Kalender State ───
+  const [selectedDate, setSelectedDate] = useState(new Date())
 
   // ─── New Entry State (DTO-Ready) ───
   const [newEntry, setNewEntry] = useState({
@@ -42,6 +46,7 @@ export default function CalorieTracker() {
       fat: parseFloat(newEntry.fat) || 0,
       mealType: newEntry.mealType,
       timestamp: new Date().toLocaleTimeString(),
+      date: selectedDate.toLocaleDateString(), // Menyimpan tanggal terpilih
     }
 
     setEntries([...entries, entry])
@@ -66,8 +71,11 @@ export default function CalorieTracker() {
     setStatusMessage('Entry deleted')
   }
 
-  // ─── Totals ───
-  const totals = entries.reduce(
+  // ─── Filter Entries Berdasarkan Tanggal yang Dipilih ───
+  const activeEntries = entries.filter((e) => e.date === selectedDate.toLocaleDateString())
+
+  // ─── Totals (Hanya untuk activeEntries) ───
+  const totals = activeEntries.reduce(
     (acc, e) => ({
       calories: acc.calories + e.calories,
       protein: acc.protein + e.protein,
@@ -81,8 +89,18 @@ export default function CalorieTracker() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Daily Progress */}
-      <div className="retro-groupbox">
+      
+      {/* Calendar & Progress */}
+      <div className="flex flex-col md:flex-row gap-3 items-start">
+        <div className="flex-none w-full md:w-auto flex justify-center">
+          <RetroCalendar 
+            selectedDate={selectedDate} 
+            onDateSelect={setSelectedDate} 
+          />
+        </div>
+        
+        {/* Daily Progress */}
+        <div className="retro-groupbox flex-1 w-full flex flex-col justify-center">
         <span className="retro-groupbox-label">📊 Daily Progress</span>
         <div className="flex justify-between text-[11px] mb-1">
           <span>Calories: {totals.calories.toFixed(0)} / {dailyGoal} kcal</span>
@@ -102,6 +120,7 @@ export default function CalorieTracker() {
           <span>🍞 Carbs: {totals.carbs.toFixed(1)}g</span>
           <span>🧈 Fat: {totals.fat.toFixed(1)}g</span>
         </div>
+      </div>
       </div>
 
       {/* Add Entry Form */}
@@ -175,11 +194,13 @@ export default function CalorieTracker() {
 
       {/* Entries List */}
       <div className="retro-groupbox">
-        <span className="retro-groupbox-label">📋 Today&apos;s Log ({entries.length} items)</span>
+        <span className="retro-groupbox-label">
+          📋 Log for {selectedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} ({activeEntries.length} items)
+        </span>
         <div className="retro-scroll-area" style={{ maxHeight: 160 }}>
-          {entries.length === 0 ? (
+          {activeEntries.length === 0 ? (
             <p className="text-gray-500 text-center p-4 text-[11px]">
-              No food entries yet. Start adding your meals!
+              No food entries for this date.
             </p>
           ) : (
             <table className="retro-table">
@@ -196,7 +217,7 @@ export default function CalorieTracker() {
                 </tr>
               </thead>
               <tbody>
-                {entries.map((entry) => (
+                {activeEntries.map((entry) => (
                   <tr key={entry.id}>
                     <td className="text-[10px]">{entry.timestamp}</td>
                     <td>{entry.name}</td>
@@ -226,7 +247,7 @@ export default function CalorieTracker() {
       <div className="retro-statusbar mt-auto">
         <div className="retro-statusbar-section">{statusMessage}</div>
         <div className="retro-statusbar-section" style={{ flex: 'none', width: 120 }}>
-          Items: {entries.length}
+          Items: {activeEntries.length}
         </div>
       </div>
     </div>
