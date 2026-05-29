@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import RetroButton from '../ui/RetroButton'
 import RetroInput from '../ui/RetroInput'
 import RetroSelect from '../ui/RetroSelect'
 import RetroCalendar from '../ui/RetroCalendar'
+import { useAuth } from '../../hooks/useAuth'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
 export default function CalorieTracker() {
   const dailyGoal = 2000
@@ -20,9 +23,65 @@ export default function CalorieTracker() {
     mealType: 'breakfast',
   })
 
-  // ─── Local entries (client-side state) ───
+  // ─── Local entries (sekarang berasal dari backend) ───
   const [entries, setEntries] = useState([])
   const [statusMessage, setStatusMessage] = useState('Ready')
+  const [loading, setLoading] = useState(false)
+
+  // ─── Auth ───
+  const { session } = useAuth()
+
+  // ─── Fetch Data dari Backend ───
+  const fetchEntries = async () => {
+    if (!session?.access_token) {
+      setStatusMessage('Login terlebih dahulu untuk melihat data')
+      setEntries([])
+      return
+    }
+    
+    setLoading(true)
+    setStatusMessage('Loading data...')
+    
+    // Format date ke YYYY-MM-DD
+    const year = selectedDate.getFullYear()
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
+    const day = String(selectedDate.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/calories?date=${dateStr}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      if (result.success) {
+        setEntries(result.data || [])
+        setStatusMessage(`Loaded ${result.data?.length || 0} items`)
+      } else {
+        throw new Error(result.message || 'Gagal memuat data')
+      }
+    } catch (err) {
+      console.error('[CalorieTracker] Fetch error:', err)
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('ERR_CONNECTION_REFUSED')) {
+        setStatusMessage('⚠️ Backend tidak tersedia (pastikan Spring Boot berjalan)')
+      } else {
+        setStatusMessage(`Error: ${err.message}`)
+      }
+      setEntries([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchEntries()
+  }, [selectedDate, session])
 
   const mealOptions = [
     { value: 'breakfast', label: '🌅 Breakfast' },
@@ -35,44 +94,111 @@ export default function CalorieTracker() {
     setNewEntry({ ...newEntry, [field]: e.target.value })
 
   // ─── Add Entry Handler ───
-  const handleAddEntry = (e) => {
+  const handleAddEntry = async (e) => {
     e.preventDefault()
-    const entry = {
-      id: Date.now(),
+    if (!session?.access_token) {
+      setStatusMessage('⚠️ Login terlebih dahulu')
+      return
+    }
+
+    setLoading(true)
+    setStatusMessage('Menyimpan data...')
+
+    const year = selectedDate.getFullYear()
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
+    const day = String(selectedDate.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
+
+    const payload = {
       name: newEntry.name,
       calories: parseFloat(newEntry.calories) || 0,
       protein: parseFloat(newEntry.protein) || 0,
       carbs: parseFloat(newEntry.carbs) || 0,
       fat: parseFloat(newEntry.fat) || 0,
       mealType: newEntry.mealType,
-      timestamp: new Date().toLocaleTimeString(),
-      date: selectedDate.toLocaleDateString(), // Menyimpan tanggal terpilih
+      entryDate: dateStr
     }
 
-    setEntries([...entries, entry])
-    setNewEntry({
-      name: '',
-      calories: '',
-      protein: '',
-      carbs: '',
-      fat: '',
-      mealType: newEntry.mealType,
-    })
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/calories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(payload)
+      })
 
-    // TODO: Replace with actual API call → POST /api/calories/entry
-    console.log('[CALORIE] New entry payload:', entry)
-    setStatusMessage(`Added: ${entry.name} (${entry.calories} kcal)`)
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`)
+      }
+
+      const result = await response.json()
+      if (result.success) {
+        setStatusMessage(`Added: ${payload.name} (${payload.calories} kcal)`)
+        setNewEntry({
+          name: '',
+          calories: '',
+          protein: '',
+          carbs: '',
+          fat: '',
+          mealType: newEntry.mealType,
+        })
+        fetchEntries() // Refresh data
+      } else {
+        throw new Error(result.message || 'Gagal menyimpan data')
+      }
+    } catch (err) {
+      console.error('[CalorieTracker] Add error:', err)
+      if (err.message?.includes('Failed to fetch')) {
+        setStatusMessage('⚠️ Backend tidak tersedia')
+      } else {
+        setStatusMessage(`Error: ${err.message}`)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleDeleteEntry = (id) => {
-    setEntries(entries.filter((e) => e.id !== id))
-    // TODO: Replace with actual API call → DELETE /api/calories/entry/{id}
-    console.log('[CALORIE] Delete entry ID:', id)
-    setStatusMessage('Entry deleted')
+  const handleDeleteEntry = async (id) => {
+    if (!session?.access_token) return
+
+    setLoading(true)
+    setStatusMessage('Menghapus data...')
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/calories/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`)
+      }
+
+      const result = await response.json()
+      if (result.success) {
+        setStatusMessage('Entry deleted')
+        fetchEntries() // Refresh data
+      } else {
+        throw new Error(result.message || 'Gagal menghapus data')
+      }
+    } catch (err) {
+      console.error('[CalorieTracker] Delete error:', err)
+      if (err.message?.includes('Failed to fetch')) {
+        setStatusMessage('⚠️ Backend tidak tersedia')
+      } else {
+        setStatusMessage(`Error: ${err.message}`)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // ─── Filter Entries Berdasarkan Tanggal yang Dipilih ───
-  const activeEntries = entries.filter((e) => e.date === selectedDate.toLocaleDateString())
+  // ─── Data entries sudah di-filter per hari dari backend ───
+  const activeEntries = entries
 
   // ─── Totals (Hanya untuk activeEntries) ───
   const totals = activeEntries.reduce(
@@ -185,8 +311,8 @@ export default function CalorieTracker() {
             />
           </div>
           <div className="flex gap-2">
-            <RetroButton type="submit" primary>
-              Add Entry
+            <RetroButton type="submit" primary disabled={loading}>
+              {loading ? 'Adding...' : 'Add Entry'}
             </RetroButton>
           </div>
         </form>
