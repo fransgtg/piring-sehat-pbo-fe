@@ -3,8 +3,17 @@ import { GeneticHeightCalculatorModel } from "../../calculators/calculators";
 import RetroButton from "../ui/RetroButton";
 import RetroInput from "../ui/RetroInput";
 import RetroSelect from "../ui/RetroSelect";
+import CalcHistoryPanel from "./CalcHistoryPanel";
+import { useCalcHistory } from "../../hooks/useCalcHistory";
+import { useAuth } from "../../hooks/useAuth";
 
 export default function GeneticHeightCalculator() {
+  const { user } = useAuth();
+
+  // Hook riwayat khusus Tinggi Genetik
+  const { history, loading, error, fetchHistory, saveHistory, deleteHistory } =
+    useCalcHistory("genetic");
+
   const [formData, setFormData] = useState({
     fatherHeight: "",
     motherHeight: "",
@@ -20,20 +29,33 @@ export default function GeneticHeightCalculator() {
   const updateField = (field) => (e) =>
     setFormData({ ...formData, [field]: e.target.value });
 
-  const calculate = (e) => {
+  const calculate = async (e) => {
     e.preventDefault();
 
-    // Instansiasi model OOP dengan data dari form
+    // Kalkulasi menggunakan rumus Mid-Parental Height (MPH)
     const model = new GeneticHeightCalculatorModel(
       formData.fatherHeight,
       formData.motherHeight,
       formData.gender,
     );
+    const summary = model.getSummary();
 
-    setResult({
-      predictedHeight: model.predictedHeight.toFixed(1),
-      range: model.range,
-    });
+    const computed = {
+      predictedHeight: summary.mainValue,
+      range: model.range, // rentang ±8.5 cm
+    };
+    setResult(computed);
+
+    if (user) {
+      await saveHistory(
+        {
+          fatherHeight: formData.fatherHeight,
+          motherHeight: formData.motherHeight,
+          gender: formData.gender,
+        },
+        { predictedHeight: computed.predictedHeight, range: computed.range },
+      );
+    }
   };
 
   const handleReset = () => {
@@ -41,8 +63,41 @@ export default function GeneticHeightCalculator() {
     setResult(null);
   };
 
+  const historyColumns = [
+    "Waktu",
+    "Tinggi Ayah",
+    "Tinggi Ibu",
+    "Jenis Kelamin",
+    "Prediksi",
+    "Rentang",
+  ];
+
+  const renderHistoryRow = (entry) => {
+    const i = entry.inputData || {};
+    const r = entry.resultData || {};
+    return (
+      <>
+        <td className="px-2 py-1 whitespace-nowrap">{entry.createdAt}</td>
+        <td className="px-2 py-1">
+          {i.fatherHeight ? `${i.fatherHeight} cm` : "-"}
+        </td>
+        <td className="px-2 py-1">
+          {i.motherHeight ? `${i.motherHeight} cm` : "-"}
+        </td>
+        <td className="px-2 py-1">
+          {i.gender === "male" ? "♂ Laki-laki" : "♀ Perempuan"}
+        </td>
+        <td className="px-2 py-1 font-bold text-[#000080]">
+          {r.predictedHeight ? `${r.predictedHeight} cm` : "-"}
+        </td>
+        <td className="px-2 py-1 text-[9px]">{r.range ?? "-"}</td>
+      </>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-3">
+      {/* ─── Form Input ─── */}
       <div className="retro-groupbox">
         <span className="retro-groupbox-label">👨‍👩‍👧 Data Orang Tua</span>
         <form onSubmit={calculate} className="flex flex-col gap-3">
@@ -88,10 +143,10 @@ export default function GeneticHeightCalculator() {
         </form>
       </div>
 
+      {/* ─── Hasil ─── */}
       {result && (
         <div className="retro-groupbox">
           <span className="retro-groupbox-label">📊 Hasil Estimasi</span>
-
           <div
             className="flex flex-col items-center py-3 mb-3"
             style={{
@@ -110,7 +165,6 @@ export default function GeneticHeightCalculator() {
               Rentang: {result.range}
             </div>
           </div>
-
           <table className="retro-table">
             <tbody>
               <tr>
@@ -119,19 +173,35 @@ export default function GeneticHeightCalculator() {
                   {result.predictedHeight} cm
                 </td>
               </tr>
+              {/* ±8.5 cm adalah standar variasi dari rumus Mid-Parental Height */}
               <tr>
                 <td className="font-bold">Rentang (±8.5 cm)</td>
                 <td>{result.range}</td>
               </tr>
             </tbody>
           </table>
-
+          {/* Disclaimer: hasil adalah estimasi, bukan jaminan */}
           <div className="retro-sunken p-2 mt-2 text-[10px] text-gray-600">
             ⚠️ Hasil ini adalah estimasi berdasarkan faktor genetik
             (Mid-Parental Height Formula). Nutrisi dan lingkungan juga
-            berpengaruh terhadap tinggi akhir.
+            berpengaruh.
           </div>
         </div>
+      )}
+
+      {/* Panel riwayat hanya muncul jika user sudah login */}
+
+      {user && (
+        <CalcHistoryPanel
+          history={history}
+          loading={loading}
+          error={error}
+          onFetch={fetchHistory}
+          onDelete={deleteHistory}
+          columns={historyColumns}
+          renderRow={renderHistoryRow}
+          emptyLabel="Belum ada riwayat perhitungan Tinggi Genetik."
+        />
       )}
     </div>
   );

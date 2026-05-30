@@ -3,8 +3,11 @@ import { ProteinCalculatorModel } from "../../calculators/calculators";
 import RetroButton from "../ui/RetroButton";
 import RetroInput from "../ui/RetroInput";
 import RetroSelect from "../ui/RetroSelect";
+import CalcHistoryPanel from "./CalcHistoryPanel";
+import { useCalcHistory } from "../../hooks/useCalcHistory";
+import { useAuth } from "../../hooks/useAuth";
 
-// Pilihan tingkat aktivitas (activity level → g/kg protein)
+// Pilihan tingkat aktivitas dengan faktor protein per kg berat badan (g/kg)
 const activityOptions = [
   { value: "0.8", label: "Sedenter — jarang olahraga (0.8 g/kg)" },
   { value: "1.0", label: "Ringan — 1-3x/minggu (1.0 g/kg)" },
@@ -14,29 +17,48 @@ const activityOptions = [
 ];
 
 export default function ProteinCalculator() {
+  const { user } = useAuth();
+
+  // Hook riwayat khusus Protein
+  const { history, loading, error, fetchHistory, saveHistory, deleteHistory } =
+    useCalcHistory("protein");
+
   const [formData, setFormData] = useState({
     weight: "",
-    activityLevel: "1.2",
+    activityLevel: "1.2", // default sedang — paling umum dipakai
   });
   const [result, setResult] = useState(null);
 
   const updateField = (field) => (e) =>
     setFormData({ ...formData, [field]: e.target.value });
 
-  const calculate = (e) => {
+  const calculate = async (e) => {
     e.preventDefault();
 
-    // Instansiasi model OOP dengan data dari form
     const model = new ProteinCalculatorModel(
       formData.weight,
       formData.activityLevel,
     );
+    const summary = model.getSummary();
 
-    setResult({
+    const computed = {
       dailyProtein: model.dailyProtein,
       weight: model.weight,
       perKg: parseFloat(formData.activityLevel),
-    });
+      activityLabel: summary.description,
+    };
+    setResult(computed);
+
+    if (user) {
+      await saveHistory(
+        { weight: formData.weight, activityLevel: formData.activityLevel },
+        {
+          dailyProtein: computed.dailyProtein,
+          activityLabel: computed.activityLabel,
+          caloriesFromProtein: computed.dailyProtein * 4, // 1g protein = 4 kkal
+        },
+      );
+    }
   };
 
   const handleReset = () => {
@@ -44,8 +66,37 @@ export default function ProteinCalculator() {
     setResult(null);
   };
 
+  const historyColumns = [
+    "Waktu",
+    "BB (kg)",
+    "Aktivitas",
+    "Protein/hari",
+    "Kalori Protein",
+  ];
+
+  const renderHistoryRow = (entry) => {
+    const i = entry.inputData || {};
+    const r = entry.resultData || {};
+    return (
+      <>
+        <td className="px-2 py-1 whitespace-nowrap">{entry.createdAt}</td>
+        <td className="px-2 py-1">{i.weight ?? "-"}</td>
+        <td className="px-2 py-1">
+          {i.activityLevel ? `×${i.activityLevel} g/kg` : "-"}
+        </td>
+        <td className="px-2 py-1 font-bold" style={{ color: "#e67e22" }}>
+          {r.dailyProtein ? `${r.dailyProtein} g` : "-"}
+        </td>
+        <td className="px-2 py-1">
+          {r.caloriesFromProtein ? `${r.caloriesFromProtein} kcal` : "-"}
+        </td>
+      </>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-3">
+      {/* ─── Form Input ─── */}
       <div className="retro-groupbox">
         <span className="retro-groupbox-label">⚙️ Data Kalkulasi</span>
         <form onSubmit={calculate} className="flex flex-col gap-3">
@@ -76,10 +127,10 @@ export default function ProteinCalculator() {
         </form>
       </div>
 
+      {/* ─── Hasil ─── */}
       {result && (
         <div className="retro-groupbox">
           <span className="retro-groupbox-label">📊 Hasil</span>
-
           <div
             className="flex flex-col items-center py-3 mb-3"
             style={{
@@ -94,11 +145,11 @@ export default function ProteinCalculator() {
             <div style={{ fontSize: 32, fontWeight: "bold", lineHeight: 1.2 }}>
               {result.dailyProtein} g
             </div>
+            {/* Tampilkan rumus agar user tahu dari mana angkanya */}
             <div style={{ fontSize: 11, opacity: 0.7 }}>
               {result.perKg} g × {result.weight} kg berat badan
             </div>
           </div>
-
           <table className="retro-table">
             <tbody>
               <tr>
@@ -115,6 +166,7 @@ export default function ProteinCalculator() {
                 <td className="font-bold">Faktor Aktivitas</td>
                 <td>{result.perKg} g/kg</td>
               </tr>
+              {/* 1g protein = 4 kkal — konversi standar nutrisi */}
               <tr>
                 <td className="font-bold">Kalori dari Protein</td>
                 <td>{result.dailyProtein * 4} kcal</td>
@@ -122,6 +174,20 @@ export default function ProteinCalculator() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Panel riwayat hanya muncul jika user sudah login */}
+      {user && (
+        <CalcHistoryPanel
+          history={history}
+          loading={loading}
+          error={error}
+          onFetch={fetchHistory}
+          onDelete={deleteHistory}
+          columns={historyColumns}
+          renderRow={renderHistoryRow}
+          emptyLabel="Belum ada riwayat perhitungan Protein."
+        />
       )}
     </div>
   );

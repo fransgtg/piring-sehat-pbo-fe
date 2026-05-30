@@ -2,16 +2,14 @@ import { useState, useEffect } from "react";
 import { useAuth } from "./hooks/useAuth";
 import RetroWindow from "./components/ui/RetroWindow";
 import AuthWindow from "./components/auth/AuthWindow";
-import BMICalculator from "./components/bmi/BMICalculator";
+import HealthCalculatorContainer from "./components/calculator/HealthCalculatorContainer";
 import CalorieTracker from "./components/calories/CalorieTracker";
 import FoodSearchExplorer from "./components/food/FoodSearchExplorer";
 import CommunityForum from "./components/forum/CommunityForum";
-import GeneticHeightCalculator from "./components/geneticheight/GeneticHeightCalculator";
-import ProteinCalculator from "./components/protein/ProteinCalculator";
 import "./App.css";
 
 export default function App() {
-  const { user } = useAuth(); // Mengambil status login pengguna
+  const { user } = useAuth();
   const [windows, setWindows] = useState([]);
   const [activeWindowId, setActiveWindowId] = useState(null);
   const [startMenuOpen, setStartMenuOpen] = useState(false);
@@ -32,29 +30,13 @@ export default function App() {
       width: 400,
       height: 420,
     },
-    bmi: {
-      id: "bmi",
-      title: "BMI & Health Calculator",
-      icon: "⚖️",
-      component: BMICalculator,
-      width: 500,
-      height: 500,
-    },
-    geneticheight: {
-      id: "geneticheight",
-      title: "Genetic Height Calculator",
-      icon: "🧬",
-      component: GeneticHeightCalculator,
+    calculator: {
+      id: "calculator",
+      title: "Health Calculator 3-in-1",
+      icon: "🧮",
+      component: HealthCalculatorContainer,
       width: 500,
       height: 560,
-    },
-    protein: {
-      id: "protein",
-      title: "Protein Calculator",
-      icon: "💪",
-      component: ProteinCalculator,
-      width: 520,
-      height: 540,
     },
     calories: {
       id: "calories",
@@ -83,14 +65,7 @@ export default function App() {
   };
 
   // Daftar fitur yang memerlukan login sebelum bisa diakses
-  const protectedApps = [
-    "bmi",
-    "geneticheight",
-    "protein",
-    "calories",
-    "food",
-    "forum",
-  ];
+  const protectedApps = ["calculator", "calories", "food", "forum"];
 
   const openWindow = (appId) => {
     setStartMenuOpen(false);
@@ -101,7 +76,6 @@ export default function App() {
       alert(
         "⚠️ Access Denied\n\nAnda harus login terlebih dahulu untuk mengakses fitur ini.",
       );
-      // Buka jendela auth secara otomatis
       appId = "auth";
     }
     setActiveWindowId(appId);
@@ -163,24 +137,10 @@ export default function App() {
         </button>
         <button
           className="retro-desktop-icon"
-          onDoubleClick={() => openWindow("bmi")}
+          onDoubleClick={() => openWindow("calculator")}
         >
-          <span className="text-3xl">⚖️</span>
-          <span>BMI Calculator</span>
-        </button>
-        <button
-          className="retro-desktop-icon"
-          onDoubleClick={() => openWindow("geneticheight")}
-        >
-          <span className="text-3xl">🧬</span>
-          <span>Genetic Height</span>
-        </button>
-        <button
-          className="retro-desktop-icon"
-          onDoubleClick={() => openWindow("protein")}
-        >
-          <span className="text-3xl">💪</span>
-          <span>Protein Calculator</span>
+          <span className="text-3xl">🧮</span>
+          <span>Health Calculator</span>
         </button>
         <button
           className="retro-desktop-icon"
@@ -245,21 +205,9 @@ export default function App() {
             </div>
             <button
               className="retro-start-menu-item font-bold"
-              onClick={() => openWindow("bmi")}
+              onClick={() => openWindow("calculator")}
             >
-              <span className="text-xl">⚖️</span> BMI Calculator
-            </button>
-            <button
-              className="retro-start-menu-item font-bold"
-              onClick={() => openWindow("geneticheight")}
-            >
-              <span className="text-xl">🧬</span> Genetic Height Calculator
-            </button>
-            <button
-              className="retro-start-menu-item font-bold"
-              onClick={() => openWindow("protein")}
-            >
-              <span className="text-xl">💪</span> Protein Calculator
+              <span className="text-xl">🧮</span> Health Calculator
             </button>
             <div className="retro-start-menu-divider"></div>
             <button

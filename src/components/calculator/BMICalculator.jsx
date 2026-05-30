@@ -3,8 +3,16 @@ import { BMICalculatorModel } from "../../calculators/calculators";
 import RetroButton from "../ui/RetroButton";
 import RetroInput from "../ui/RetroInput";
 import RetroSelect from "../ui/RetroSelect";
+import CalcHistoryPanel from "./CalcHistoryPanel";
+import { useCalcHistory } from "../../hooks/useCalcHistory";
+import { useAuth } from "../../hooks/useAuth";
 
 export default function BMICalculator() {
+  const { user } = useAuth();
+  const { history, loading, error, fetchHistory, saveHistory, deleteHistory } =
+    useCalcHistory("bmi");
+
+  //mengelola fetch, simpan, hapus ke backend dengan custom hook useCalcHistory
   const [formData, setFormData] = useState({
     weight: "",
     height: "",
@@ -21,26 +29,48 @@ export default function BMICalculator() {
   const updateField = (field) => (e) =>
     setFormData({ ...formData, [field]: e.target.value });
 
-  const calculateBMI = (e) => {
+  // Higher-order function: update satu field tanpa menghapus field lainnya
+  const calculateBMI = async (e) => {
     e.preventDefault();
 
-    // Instansiasi model OOP dengan data dari form
+    // Kalkulasi menggunakan model OOP — logika ada di BMICalculatorModel
     const model = new BMICalculatorModel(
       formData.weight,
       formData.height,
       formData.age,
       formData.gender,
     );
+    const summary = model.getSummary();
 
-    setResult({
-      bmi: model.bmi.toFixed(1),
-      category: model.details.category,
-      color: model.details.color,
+    const computed = {
+      bmi: summary.mainValue,
+      category: summary.description,
+      color: summary.color,
       idealWeightRange: model.idealWeightRange,
       bmr: Math.round(model.bmr),
       dailyCalories: model.dailyCalories,
       bmiPercent: Math.min(100, (model.bmi / 40) * 100),
-    });
+    };
+    setResult(computed);
+
+    // Simpan ke backend hanya jika sudah login
+    if (user) {
+      await saveHistory(
+        {
+          weight: formData.weight,
+          height: formData.height,
+          age: formData.age,
+          gender: formData.gender,
+        },
+        {
+          bmi: computed.bmi,
+          category: computed.category,
+          bmr: computed.bmr,
+          dailyCalories: computed.dailyCalories,
+          idealWeightRange: computed.idealWeightRange,
+        },
+      );
+    }
   };
 
   const handleReset = () => {
@@ -48,8 +78,43 @@ export default function BMICalculator() {
     setResult(null);
   };
 
+  const historyColumns = [
+    "Waktu",
+    "BB (kg)",
+    "TB (cm)",
+    "Kelamin",
+    "BMI",
+    "Kategori",
+    "Kalori/hari",
+  ];
+
+  // Render satu baris tabel riwayat BMI
+  // Menggunakan ?? '-' agar tidak ada sel kosong jika data tidak lengkap
+  const renderHistoryRow = (entry) => {
+    const i = entry.inputData || {};
+    const r = entry.resultData || {};
+    return (
+      <>
+        <td className="px-2 py-1 whitespace-nowrap">{entry.createdAt}</td>
+        <td className="px-2 py-1">{i.weight ?? "-"}</td>
+        <td className="px-2 py-1">{i.height ?? "-"}</td>
+        <td className="px-2 py-1">
+          {i.gender === "male" ? "♂" : i.gender === "female" ? "♀" : "-"}
+        </td>
+        <td className="px-2 py-1 font-bold">{r.bmi ?? "-"}</td>
+        <td className="px-2 py-1" style={{ color: r.color }}>
+          {r.category ?? "-"}
+        </td>
+        <td className="px-2 py-1">
+          {r.dailyCalories ? `${r.dailyCalories} kcal` : "-"}
+        </td>
+      </>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-3">
+      {/* ─── Form Perhitungan ─── */}
       <div className="retro-groupbox">
         <span className="retro-groupbox-label">📏 Pengukuran Tubuh</span>
         <form onSubmit={calculateBMI} className="flex flex-col gap-3">
@@ -103,10 +168,10 @@ export default function BMICalculator() {
         </form>
       </div>
 
+      {/* ─── Hasil (hanya tampil setelah form disubmit) ─── */}
       {result && (
         <div className="retro-groupbox">
           <span className="retro-groupbox-label">📊 Hasil</span>
-
           <div className="mb-3">
             <div className="flex justify-between text-[11px] mb-1">
               <span>Skala BMI</span>
@@ -114,6 +179,7 @@ export default function BMICalculator() {
                 {result.bmi} — {result.category}
               </span>
             </div>
+            {/* Progress bar: lebar proporsional terhadap nilai BMI (skala 0–40) */}
             <div className="retro-progress">
               <div
                 className="retro-progress-fill"
@@ -131,7 +197,6 @@ export default function BMICalculator() {
               <span>40+</span>
             </div>
           </div>
-
           <table className="retro-table">
             <tbody>
               <tr>
@@ -159,6 +224,20 @@ export default function BMICalculator() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* ─── Panel Riwayat (hanya tampil jika sudah login) ─── */}
+      {user && (
+        <CalcHistoryPanel
+          history={history}
+          loading={loading}
+          error={error}
+          onFetch={fetchHistory}
+          onDelete={deleteHistory}
+          columns={historyColumns}
+          renderRow={renderHistoryRow}
+          emptyLabel="Belum ada riwayat perhitungan BMI."
+        />
       )}
     </div>
   );
