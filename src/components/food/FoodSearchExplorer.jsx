@@ -19,7 +19,6 @@ export default function FoodSearchExplorer() {
     setStatusMessage(`Searching for "${q}"...`)
 
     try {
-      // 1. Sesuaikan nama tabel ke 'nutrition'
       const { data, error } = await supabase
         .from('nutrition')
         .select('*')
@@ -28,16 +27,15 @@ export default function FoodSearchExplorer() {
 
       if (error) throw error
 
-      // 2. Sesuaikan nama kolom dengan struktur CSV Anda
       const mapped = (data || []).map((item) => ({
         id: item.id,
         name: item.name || '',
-        servingSize: '1 Porsi', // Dataset CSV tidak memiliki porsi, jadi dibuat default
+        servingSize: '1 Porsi', 
         calories: item.calories || 0,
-        protein: item.proteins || 0,       // Dari kolom 'proteins'
-        carbs: item.carbohydrate || 0,     // Dari kolom 'carbohydrate'
+        protein: item.proteins || 0,       
+        carbs: item.carbohydrate || 0,     
         fat: item.fat || 0,
-        image: item.image || ''            // Mengambil link gambar dari DB
+        image: item.image || ''            
       }))
 
       setResults(mapped)
@@ -52,54 +50,86 @@ export default function FoodSearchExplorer() {
   }
 
   return (
-    <div className="flex flex-col gap-3 h-full">
+    <div className="flex flex-col gap-4 h-full">
       {/* Search Bar */}
-      <div className="retro-groupbox">
-        <span className="retro-groupbox-label">🔍 Search Database</span>
-        <form onSubmit={handleSearch} className="flex gap-2 items-end">
+      <div className="retro-groupbox shadow-sm">
+        <span className="retro-groupbox-label font-bold text-[#000080]">🔍 Search Database</span>
+        <form onSubmit={handleSearch} className="flex gap-3 items-end mt-1">
           <div className="flex-1">
             <RetroInput
               id="food-search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="e.g. Abon, Agar-agar, Tempe..."
+              className="w-full focus:ring-2 focus:ring-[#000080] transition-all"
             />
           </div>
-          <RetroButton type="submit" primary disabled={loading}>
-            {loading ? '...' : 'Search'}
+          <RetroButton type="submit" primary disabled={loading} className="min-w-[100px]">
+            {loading ? (
+              <span className="animate-pulse">Loading...</span>
+            ) : (
+              'Search ↵'
+            )}
           </RetroButton>
         </form>
       </div>
 
       {/* Results Grid */}
-      <div className="retro-groupbox flex-1 flex flex-col">
-        <span className="retro-groupbox-label">📑 Results</span>
-        <div className="retro-scroll-area flex-1 min-h-[150px]">
+      <div className="retro-groupbox flex-1 flex flex-col shadow-sm">
+        <span className="retro-groupbox-label font-bold text-[#000080]">📑 Results</span>
+        <div className="retro-scroll-area flex-1 min-h-[250px] p-2 bg-[#f8f9fa]">
           {results.length === 0 ? (
-             <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
-                <span className="text-[32px] mb-2">🍽️</span>
-                <p>Search for food to view nutrition facts.</p>
-                <p className="text-[10px] mt-1">(Results will populate here from backend)</p>
+             <div className="flex flex-col items-center justify-center h-full text-gray-500 p-6 text-center animate-fade-in">
+                <span className="text-[48px] mb-3 opacity-80">🍽️</span>
+                <p className="font-semibold text-[14px] text-[#000080]">Database Makanan Kosong</p>
+                <p className="text-[11px] mt-1">Ketik nama makanan di atas untuk melihat nutrisinya.</p>
              </div>
           ) : (
-            <div className="grid grid-cols-1 gap-2 p-2">
+            <div className="grid grid-cols-1 gap-3">
               {results.map((food) => (
-                <div key={food.id} className="retro-raised p-2 flex justify-between items-center bg-white">
-                  <div className="flex items-center gap-2">
-                    {/* Menambahkan elemen gambar jika link image tersedia di database */}
-                    {food.image && (
-                      <img src={food.image} alt={food.name} className="w-10 h-10 object-cover rounded border" />
+                <div 
+                  key={food.id} 
+                  className="retro-raised p-3 flex justify-between items-center bg-white group hover:bg-[#000080] hover:text-white transition-all duration-200 cursor-pointer rounded-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    {food.image ? (
+                      <img 
+                        src={food.image} 
+                        alt={food.name} 
+                        className="w-12 h-12 object-cover rounded border-2 border-gray-200 group-hover:border-white transition-colors" 
+                        onError={(e) => { e.target.style.display = 'none' }} // Sembunyikan jika gambar gagal dimuat
+                      />
+                    ) : (
+                      // Placeholder jika tidak ada gambar
+                      <div className="w-12 h-12 bg-gray-200 border-2 border-gray-300 rounded flex items-center justify-center text-[20px] group-hover:border-white">
+                        🍲
+                      </div>
                     )}
-                    <div>
-                      <h4 className="font-bold text-[13px]">{food.name}</h4>
-                      <p className="text-[10px] text-gray-600">{food.servingSize}</p>
+                    <div className="flex flex-col justify-center">
+                      <h4 className="font-bold text-[14px] leading-tight">{food.name}</h4>
+                      <p className="text-[11px] text-gray-500 group-hover:text-gray-300 mt-0.5">{food.servingSize}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-[#000080]">{food.calories} kcal</p>
-                    <p className="text-[10px]">
-                      P:{food.protein}g C:{food.carbs}g F:{food.fat}g
+                  
+                  <div className="text-right flex flex-col items-end gap-1">
+                    <p className="font-extrabold text-[#000080] group-hover:text-[#FFD700] text-[15px]">
+                      {food.calories} <span className="text-[10px] font-normal">kcal</span>
                     </p>
+                    
+                    {/* BAGIAN YANG DIPERBARUI: Teks makronutrisi tidak lagi disingkat */}
+                    <div className="flex gap-1.5 text-[9px] font-mono mt-1">
+                      <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded group-hover:bg-white group-hover:text-[#000080]">
+                        Protein: {food.protein}g
+                      </span>
+                      <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded group-hover:bg-white group-hover:text-[#000080]">
+                        Karbohidrat: {food.carbs}g
+                      </span>
+                      <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded group-hover:bg-white group-hover:text-[#000080]">
+                        Lemak: {food.fat}g
+                      </span>
+                    </div>
+                    {/* AKHIR BAGIAN YANG DIPERBARUI */}
+
                   </div>
                 </div>
               ))}
@@ -109,10 +139,12 @@ export default function FoodSearchExplorer() {
       </div>
 
       {/* Status Bar */}
-      <div className="retro-statusbar mt-auto">
-        <div className="retro-statusbar-section">{statusMessage}</div>
+      <div className="retro-statusbar mt-auto font-mono text-[11px]">
+        <div className="retro-statusbar-section flex-1 truncate">
+          {loading ? '⏳ ' : '✓ '}{statusMessage}
+        </div>
         <div className="retro-statusbar-section" style={{ flex: 'none', width: 120 }}>
-          Found: {results.length}
+          Count: {results.length}
         </div>
       </div>
     </div>
